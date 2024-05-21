@@ -2,10 +2,15 @@
 
 import { useEffect, useState } from "react";
 import useServiceWorker from "@/hooks/useServiceWorker";
+import { Toggle } from "@/components/Toggle";
+import { useCheckSubscription } from "@/hooks/useCheckSubscription";
 
 export default function Home() {
   // register service worker
   useServiceWorker();
+
+  // check if current device is subscribed to notifications
+  const { isSubscribed, checkSubscription } = useCheckSubscription();
 
   const [permissionGranted, setPermissionGranted] =
     useState<NotificationPermission>("default");
@@ -46,6 +51,14 @@ export default function Home() {
   };
 
   const subscribe = async () => {
+    // if user previously disallowed notifications,
+    // they will have to manually re-enable it themselves
+    if (permissionGranted === "denied") {
+      alert(
+        "You previously denied permission. Please enable notifications from browser settings."
+      );
+      return;
+    }
     try {
       const sw = await navigator.serviceWorker.ready;
 
@@ -58,11 +71,42 @@ export default function Home() {
       setPermissionGranted("granted");
 
       // save to db
-      sendSubscriptionToServer(pushSubscription);
+      await sendSubscriptionToServer(pushSubscription);
+      await checkSubscription();
     } catch (err) {
       setPermissionGranted("denied");
       console.log("An error occurred with the service worker", err);
     }
+  };
+
+  const unsubscribe = async () => {
+    const sw = await navigator.serviceWorker.ready;
+    const subscription = await sw?.pushManager.getSubscription();
+
+    if (subscription) {
+      const { endpoint } = subscription;
+      try {
+        const response = await fetch("/api/removeSubscription", {
+          method: "DELETE",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ endpoint }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || "Failed to remove subscription");
+        }
+
+        const result = await response.json();
+        console.log("Subscription removed successfully:", result);
+      } catch (error) {
+        console.error("Error removing subscription:", error);
+      }
+    }
+    // re-check subscription to update state.
+    await checkSubscription();
   };
 
   // Function to send notification to all subscribed users
@@ -88,38 +132,41 @@ export default function Home() {
     }
   };
 
-  // button text for notification request
-  let notificationButtonText = "Request permission";
-  if (permissionGranted === "denied") {
-    notificationButtonText = "Notification permission denied";
-  } else if (permissionGranted === "granted") {
-    notificationButtonText = "Notifications permission granted";
-  }
-
   return (
     <main className="flex min-h-screen flex-col items-center justify-between p-24">
-      <div className="flex flex-col items-center space-y-10">
+      <div className="flex flex-col items-center space-y-10 w-72">
         <div className="flex flex-col items-center space-y-2">
-          <p>User initiates the permission request.</p>
-          <button
-            type="button"
-            className="rounded-md bg-white/10 px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-white/20"
-            onClick={subscribe}
-            disabled={permissionGranted === "granted"}
-          >
-            {notificationButtonText}
-          </button>
+          <div className="flex flex-col items-start justify-center space-y-2">
+            <div className="flex space-x-2 items-center justify-center">
+              <p>Enable notifications</p>
+              <Toggle
+                onChange={isSubscribed ? unsubscribe : subscribe}
+                isSubscribed={isSubscribed}
+                permissionGranted={permissionGranted}
+              />
+            </div>
+            <span className="text-xs">
+              {isSubscribed
+                ? "Notifications are enabled. You'll receive timely transactions status updates."
+                : "Notifications are disabled. You'll miss out on timely transaction updates."}
+            </span>
+          </div>
         </div>
 
-        <div className="flex flex-col items-center space-y-2">
-          <p>Send a sample notification</p>
-          <button
-            type="button"
-            className="rounded-md bg-white/10 px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-white/20"
-            onClick={sendNotificationToAll}
-          >
-            Send notification
-          </button>
+        <div className="flex flex-col items-start space-y-2 rounded-2xl border-yellow-100 border p-4 w-full">
+          <p className="w-full">Send a sample notification</p>
+          <span className="text-xs w-full">
+            Sends a sample notification to ALL subscriptions.
+          </span>
+          <div className="w-full text-center">
+            <button
+              type="button"
+              className="rounded-md bg-white/10 px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-white/20"
+              onClick={sendNotificationToAll}
+            >
+              Send notification
+            </button>
+          </div>
         </div>
       </div>
     </main>
