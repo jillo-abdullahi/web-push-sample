@@ -7,6 +7,7 @@ const inter = Inter({ subsets: ["latin"] });
 export const metadata: Metadata = {
   title: "Web push app",
   description: "A sample web push app",
+  manifest: "/manifest.webmanifest"
 };
 
 export default function RootLayout({
