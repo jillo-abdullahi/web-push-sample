@@ -1,6 +1,6 @@
 {
   "name": "Webpush - sample demo app",
-  "short_name": "Webpush",
+  "short_name": "GasHawk",
   "theme_color": "#0D0D0D",
   "background_color": "#0D0D0D",
   "display": "standalone",

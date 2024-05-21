@@ -5,7 +5,7 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Web push app",
+  title: "GasHawk Web Push",
   description: "A sample web push app",
   manifest: "/manifest.webmanifest"
 };
